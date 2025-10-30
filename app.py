@@ -5,6 +5,8 @@ import time
 from datetime import datetime
 import numpy as np
 from PIL import Image
+import glob
+from typing import List, Tuple
 
 # Configure Streamlit page
 st.set_page_config(
@@ -134,6 +136,71 @@ def process_paddleocr(ocr_model, image_data):
 
     return pure_text, str(text_filename)
 
+def get_images_from_folder(folder_path: str) -> List[Path]:
+    """Get all image files from a specified folder"""
+    supported_extensions = ['*.png', '*.jpg', '*.jpeg', '*.PNG', '*.JPG', '*.JPEG']
+    image_files = []
+    seen_files = set()  # Track unique files to avoid duplicates
+
+    folder = Path(folder_path)
+    if not folder.exists():
+        raise FileNotFoundError(f"文件夹不存在: {folder_path}")
+
+    for ext in supported_extensions:
+        for img_path in folder.glob(ext):
+            # Use absolute path to avoid duplicates on case-insensitive filesystems (Windows)
+            abs_path = img_path.resolve()
+            if abs_path not in seen_files:
+                seen_files.add(abs_path)
+                image_files.append(img_path)
+
+    return sorted(image_files)
+
+def process_batch_images(model_type: str, image_paths: List[Path], ocr_model=None, pipeline=None) -> List[Tuple[str, str, str]]:
+    """
+    Batch process multiple images
+
+    Args:
+        model_type: "PaddleOCR" or "PP-StructureV3"
+        image_paths: List of image file paths
+        ocr_model: PaddleOCR model instance (for PaddleOCR mode)
+        pipeline: PPStructureV3 pipeline instance (for PP-StructureV3 mode)
+
+    Returns:
+        List of tuples: (image_name, result_content, output_file_path)
+    """
+    results = []
+
+    for i, img_path in enumerate(image_paths):
+        try:
+            print(f"\n{'='*60}")
+            print(f"处理第 {i+1}/{len(image_paths)} 张图片: {img_path.name}")
+            print(f"{'='*60}")
+
+            if model_type == "PaddleOCR":
+                # Process with PaddleOCR
+                image = Image.open(img_path)
+                image_array = np.array(image)
+                result_text, saved_file = process_paddleocr(ocr_model, image_array)
+                results.append((img_path.name, result_text, saved_file))
+
+            else:  # PP-StructureV3
+                # Process with PP-StructureV3
+                markdown_result, saved_file = process_ppstructurev3(pipeline, img_path)
+                if markdown_result:
+                    results.append((img_path.name, markdown_result, saved_file))
+                else:
+                    results.append((img_path.name, "Markdown文件已生成", saved_file))
+
+            print(f"✅ 成功处理: {img_path.name}")
+
+        except Exception as e:
+            error_msg = f"处理失败: {str(e)}"
+            print(f"❌ {img_path.name}: {error_msg}")
+            results.append((img_path.name, f"错误: {error_msg}", ""))
+
+    return results
+
 def process_ppstructurev3(pipeline, image_path):
     """Process image with PPStructureV3 and save markdown and images using the working PP-StructureV3.py approach"""
     # Ensure we have a proper string path
@@ -253,15 +320,53 @@ def main():
         - 💾 自动保存图片和文件
         """)
 
-    # File upload section
-    st.header("📁 上传图片")
-    uploaded_file = st.file_uploader(
-        "选择图片文件",
-        type=['png', 'jpg', 'jpeg'],
-        help="支持 PNG、JPG、JPEG 格式的图片文件"
+    # Upload mode selection
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📤 上传模式")
+    upload_mode = st.sidebar.radio(
+        "选择上传方式",
+        ["单张图片", "多张图片", "指定文件夹"],
+        index=0
     )
 
-    if uploaded_file is not None:
+    # File upload section
+    st.header("📁 上传图片")
+
+    # Different upload interfaces based on mode
+    if upload_mode == "单张图片":
+        uploaded_file = st.file_uploader(
+            "选择图片文件",
+            type=['png', 'jpg', 'jpeg'],
+            help="支持 PNG、JPG、JPEG 格式的图片文件"
+        )
+    elif upload_mode == "多张图片":
+        uploaded_files = st.file_uploader(
+            "选择多张图片文件",
+            type=['png', 'jpg', 'jpeg'],
+            accept_multiple_files=True,
+            help="支持同时上传多张 PNG、JPG、JPEG 格式的图片文件"
+        )
+    else:  # 指定文件夹
+        folder_path = st.text_input(
+            "输入图片文件夹路径",
+            placeholder="例如: D:\\Images\\Documents",
+            help="输入包含图片文件的文件夹完整路径"
+        )
+        if folder_path:
+            try:
+                image_files = get_images_from_folder(folder_path)
+                if image_files:
+                    st.success(f"✅ 找到 {len(image_files)} 张图片")
+                    with st.expander("查看文件列表", expanded=False):
+                        for img in image_files:
+                            st.text(f"• {img.name}")
+                else:
+                    st.warning("⚠️ 该文件夹中没有找到支持的图片文件 (PNG/JPG/JPEG)")
+            except Exception as e:
+                st.error(f"❌ 读取文件夹失败: {str(e)}")
+
+    # Process based on upload mode
+    if upload_mode == "单张图片" and uploaded_file is not None:
         # Display uploaded image
         col1, col2 = st.columns([1, 1])
 
@@ -374,12 +479,185 @@ def main():
                     5. 确认临时文件存在且可访问
                     """)
 
+    # Batch processing for multiple uploaded files
+    elif upload_mode == "多张图片" and 'uploaded_files' in locals() and uploaded_files:
+        st.info(f"📋 已选择 {len(uploaded_files)} 张图片")
+
+        # Show preview of uploaded images
+        with st.expander("查看上传的图片", expanded=True):
+            cols = st.columns(min(4, len(uploaded_files)))
+            for idx, file in enumerate(uploaded_files[:8]):  # Show first 8 images
+                with cols[idx % 4]:
+                    st.image(file, caption=file.name, use_container_width=True)
+            if len(uploaded_files) > 8:
+                st.info(f"... 还有 {len(uploaded_files) - 8} 张图片未显示")
+
+        # Process button for batch
+        process_button = st.button(
+            f"🚀 批量处理 ({len(uploaded_files)} 张图片)",
+            type="primary",
+            use_container_width=True
+        )
+
+        if process_button:
+            # Save uploaded files to temp directory
+            temp_dir = Path("temp")
+            temp_dir.mkdir(exist_ok=True)
+
+            image_paths = []
+            import hashlib
+
+            progress_bar = st.progress(0, text="正在保存上传的文件...")
+            for idx, uploaded_file in enumerate(uploaded_files):
+                file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()[:8]
+                temp_image_path = temp_dir / f"temp_{file_hash}_{uploaded_file.name}"
+
+                if not temp_image_path.exists():
+                    with open(temp_image_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+
+                image_paths.append(temp_image_path)
+                progress_bar.progress((idx + 1) / len(uploaded_files), text=f"已保存 {idx + 1}/{len(uploaded_files)} 个文件")
+
+            progress_bar.empty()
+
+            # Process batch images
+            with st.spinner(f"正在使用 {model_type.split('(')[0].strip()} 批量处理 {len(image_paths)} 张图片..."):
+                try:
+                    start_time = time.time()
+
+                    if model_type == "PaddleOCR (标准OCR)":
+                        with st.spinner("加载 PaddleOCR 模型..."):
+                            ocr_model = load_paddleocr_model()
+                        results = process_batch_images("PaddleOCR", image_paths, ocr_model=ocr_model)
+                    else:
+                        with st.spinner("加载 PP-StructureV3 模型..."):
+                            pipeline = load_ppstructurev3_model()
+                        results = process_batch_images("PP-StructureV3", image_paths, pipeline=pipeline)
+
+                    processing_time = time.time() - start_time
+
+                    # Display batch results
+                    st.success(f"✅ 批量处理完成！共处理 {len(results)} 张图片，用时: {processing_time:.2f} 秒")
+
+                    # Show results summary
+                    st.markdown("### 📊 处理结果汇总")
+                    success_count = sum(1 for r in results if not r[1].startswith("错误"))
+                    error_count = len(results) - success_count
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("总计", len(results))
+                    with col2:
+                        st.metric("成功", success_count)
+                    with col3:
+                        st.metric("失败", error_count)
+
+                    # Show detailed results
+                    st.markdown("### 📝 详细结果")
+                    for img_name, content, output_file in results:
+                        with st.expander(f"📄 {img_name}", expanded=False):
+                            if not content.startswith("错误"):
+                                st.text_area("识别结果", content[:500] + ("..." if len(content) > 500 else ""), height=150, key=f"result_{img_name}")
+                                if output_file:
+                                    st.info(f"✅ 已保存至: `{output_file}`")
+                            else:
+                                st.error(content)
+
+                except Exception as e:
+                    st.error(f"❌ 批量处理过程中出现错误: {str(e)}")
+                    print(f"❌ Batch processing error: {e}")
+
+    # Batch processing for folder
+    elif upload_mode == "指定文件夹" and 'folder_path' in locals() and folder_path:
+        try:
+            image_files = get_images_from_folder(folder_path)
+
+            if image_files:
+                st.success(f"✅ 找到 {len(image_files)} 张图片")
+
+                # Show preview
+                with st.expander("查看文件夹中的图片", expanded=True):
+                    cols = st.columns(min(4, len(image_files)))
+                    for idx, img_path in enumerate(image_files[:8]):
+                        with cols[idx % 4]:
+                            try:
+                                st.image(str(img_path), caption=img_path.name, use_container_width=True)
+                            except Exception as e:
+                                st.text(img_path.name)
+                    if len(image_files) > 8:
+                        st.info(f"... 还有 {len(image_files) - 8} 张图片未显示")
+
+                # Process button
+                process_button = st.button(
+                    f"🚀 批量处理文件夹 ({len(image_files)} 张图片)",
+                    type="primary",
+                    use_container_width=True
+                )
+
+                if process_button:
+                    with st.spinner(f"正在使用 {model_type.split('(')[0].strip()} 批量处理 {len(image_files)} 张图片..."):
+                        try:
+                            start_time = time.time()
+
+                            if model_type == "PaddleOCR (标准OCR)":
+                                with st.spinner("加载 PaddleOCR 模型..."):
+                                    ocr_model = load_paddleocr_model()
+                                results = process_batch_images("PaddleOCR", image_files, ocr_model=ocr_model)
+                            else:
+                                with st.spinner("加载 PP-StructureV3 模型..."):
+                                    pipeline = load_ppstructurev3_model()
+                                results = process_batch_images("PP-StructureV3", image_files, pipeline=pipeline)
+
+                            processing_time = time.time() - start_time
+
+                            # Display results
+                            st.success(f"✅ 批量处理完成！共处理 {len(results)} 张图片，用时: {processing_time:.2f} 秒")
+
+                            # Show results summary
+                            st.markdown("### 📊 处理结果汇总")
+                            success_count = sum(1 for r in results if not r[1].startswith("错误"))
+                            error_count = len(results) - success_count
+
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("总计", len(results))
+                            with col2:
+                                st.metric("成功", success_count)
+                            with col3:
+                                st.metric("失败", error_count)
+
+                            # Show detailed results
+                            st.markdown("### 📝 详细结果")
+                            for img_name, content, output_file in results:
+                                with st.expander(f"📄 {img_name}", expanded=False):
+                                    if not content.startswith("错误"):
+                                        st.text_area("识别结果", content[:500] + ("..." if len(content) > 500 else ""), height=150, key=f"folder_result_{img_name}")
+                                        if output_file:
+                                            st.info(f"✅ 已保存至: `{output_file}`")
+                                    else:
+                                        st.error(content)
+
+                        except Exception as e:
+                            st.error(f"❌ 批量处理过程中出现错误: {str(e)}")
+                            print(f"❌ Folder batch processing error: {e}")
+
+            else:
+                st.warning("⚠️ 该文件夹中没有找到支持的图片文件")
+
+        except Exception as e:
+            st.error(f"❌ 读取文件夹失败: {str(e)}")
+
     # Footer
     st.markdown("---")
     st.markdown("""
     ### 💡 使用说明
     - **PaddleOCR**: 快速文字识别，输出纯文本格式
     - **PP-StructureV3**: 高级文档解析，识别文档结构，输出 Markdown 格式
+    - **上传模式**:
+      - 单张图片: 适合处理单个文档
+      - 多张图片: 手动选择多张图片批量处理
+      - 指定文件夹: 自动读取文件夹内所有图片批量处理
     - 所有处理结果都自动保存在 `output` 文件夹中
     - 支持的图片格式：PNG、JPG、JPEG
     """)
