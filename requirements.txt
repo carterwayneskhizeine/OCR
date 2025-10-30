@@ -1,0 +1,36 @@
+# PaddleOCR 文档识别系统依赖
+# 注意：PaddleOCR 和 PaddleX 需要单独安装，请参考 CLAUDE.md 或 README.md 中的完整安装说明
+
+# Web 应用框架
+streamlit>=1.50.0
+
+# 图像处理和数值计算
+numpy>=2.0.0
+pandas>=2.0.0
+pillow>=10.0.0
+opencv-contrib-python>=4.0.0
+
+# 注意事项：
+# 1. PaddleOCR 需要从源码安装：
+#    git clone https://github.com/PaddlePaddle/PaddleOCR.git D:\Code\PaddleOCR
+#    pip install -e "D:\Code\PaddleOCR" -i https://mirrors.aliyun.com/pypi/simple/
+#
+# 2. PaddlePaddle 需要单独安装：
+#    CPU版本：python -m pip install paddlepaddle==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+#    GPU版本：请参考 PaddlePaddle 官网安装指南
+#
+# 3. PaddleX 需要单独安装（PP-StructureV3 功能必需）：
+#    pip install paddlex
+#    pip install "paddlex[ocr]"
+
+# 可选：如果不想从源码安装 PaddleOCR，可以取消下面的注释
+# paddleocr>=3.0.0
+
+# 完整安装步骤：
+# 1. conda activate ppocrv5structurev3
+# 2. pip install -r requirements.txt
+# 3. git clone https://github.com/PaddlePaddle/PaddleOCR.git D:\Code\PaddleOCR
+# 4. pip install -e "D:\Code\PaddleOCR" -i https://mirrors.aliyun.com/pypi/simple/
+# 5. pip install paddlepaddle==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+# 6. pip install paddlex
+# 7. pip install "paddlex[ocr]"
