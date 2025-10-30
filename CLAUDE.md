@@ -50,13 +50,7 @@ pip install -r requirements.txt
 
 To activate the conda environment in Claude Code on Windows:
 ```bash
-# Method 1: Use conda activate directly
-conda activate ppocrv5structurev3
-
-# Method 2: If conda activate fails, use full path
-C:\ProgramData\anaconda3\Scripts\activate.bat ppocrv5structurev3
-
-# Method 3: Use source command
+# Use source command
 source C:/ProgramData/anaconda3/etc/profile.d/conda.sh && conda activate ppocrv5structurev3
 ```
 
