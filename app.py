@@ -298,28 +298,6 @@ def main():
         index=0
     )
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 模型说明")
-    if model_type == "PaddleOCR (标准OCR)":
-        st.sidebar.info("""
-        **PaddleOCR 标准模式**
-
-        - ✅ 纯文本提取
-        - ✅ 快速识别
-        - ✅ 适合简单OCR任务
-        - 📄 仅输出纯文本
-        """)
-    else:
-        st.sidebar.info("""
-        **PP-StructureV3 模式**
-
-        - ✅ 文档结构分析
-        - ✅ 版面布局识别
-        - ✅ 表格和图像处理
-        - 📝 输出 Markdown 格式
-        - 💾 自动保存图片和文件
-        """)
-
     # Upload mode selection
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📤 上传模式")
@@ -648,28 +626,5 @@ def main():
         except Exception as e:
             st.error(f"❌ 读取文件夹失败: {str(e)}")
 
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    ### 💡 使用说明
-    - **PaddleOCR**: 快速文字识别，输出纯文本格式
-    - **PP-StructureV3**: 高级文档解析，识别文档结构，输出 Markdown 格式
-    - **上传模式**:
-      - 单张图片: 适合处理单个文档
-      - 多张图片: 手动选择多张图片批量处理
-      - 指定文件夹: 自动读取文件夹内所有图片批量处理
-    - 所有处理结果都自动保存在 `output` 文件夹中
-    - 支持的图片格式：PNG、JPG、JPEG
-    """)
-
-    # Environment status
-    st.markdown("---")
-    st.markdown("### 🔧 环境状态")
-    st.info("""
-    ✅ 当前环境: ppocrv5structurev3
-    ✅ 支持模型: PaddleOCR, PP-StructureV3
-    📁 输出目录: output/
-    """)
-
 if __name__ == "__main__":
-    main()
+    main()
