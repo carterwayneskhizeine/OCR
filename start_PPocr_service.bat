@@ -5,14 +5,7 @@ echo 🚀 PaddleOCR 文档识别系统启动器
 echo ========================================
 echo.
 echo 📄 系统: PaddleOCR + PP-StructureV3 双模式识别
-echo ⚡ 环境: ppocrv5structurev3
 echo 🌐 地址: http://localhost:8501
-echo.
-echo ✨ 功能特点:
-echo    - 🔤 PaddleOCR 标准模式: 快速文字识别
-echo    - 📄 PP-StructureV3 模式: 高级文档解析
-echo    - 🖼️ 智能图片处理和去重
-echo    - 💾 自动保存识别结果
 echo.
 echo ⏳ 首次运行模型下载需要 2-3 分钟
 echo     后续启动会使用缓存模型，速度更快
